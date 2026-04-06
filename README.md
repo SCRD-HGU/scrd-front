@@ -4,6 +4,13 @@ SCRD는 방탈출 테마 탐색, 예약, 리뷰를 지원하는 SPA입니다.
 사용자 흐름은 이커머스 서비스와 유사하게 구성되어 있습니다.
 테마 탐색 -> 검색/필터 -> 상세 확인 -> 예약 가능 시간 확인 -> 예약 -> 리뷰 확인/작성
 
+![React](https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react&logoColor=white)
+![React Router](https://img.shields.io/badge/React_Router-6.14.1-CA4245?logo=reactrouter&logoColor=white)
+![Recoil](https://img.shields.io/badge/Recoil-0.7.7-3578E5?logo=recoil&logoColor=white)
+![React Query](https://img.shields.io/badge/React_Query-3.39.3-FF4154?logo=reactquery&logoColor=white)
+![Axios](https://img.shields.io/badge/Axios-1.7.9-5A29E4?logo=axios&logoColor=white)
+![Styled Components](https://img.shields.io/badge/styled--components-6.1.13-DB7093?logo=styledcomponents&logoColor=white)
+
 [![SCRD 앱 홍보영상](https://img.youtube.com/vi/Qu4Drg5c4mA/0.jpg)](https://www.youtube.com/watch?v=Qu4Drg5c4mA)
 
 - **기간**: 2024.10.23 ~ 2025.05.20 (총 7개월)<br>
@@ -65,12 +72,110 @@ SCRD는 방탈출 테마 탐색, 예약, 리뷰를 지원하는 SPA입니다.
 - **`useApi` 훅**
   - React Query 기반 공통 CRUD 래퍼(`useGet`, `usePost`, `usePut`, `useDelete`)
   - 쓰기 작업 이후 query invalidation 전략 적용
+  - 코드 예시:
+
+```js
+// src/hooks/useApi.js
+const useGet = (endpoint, options = {}) => {
+  return useQuery(
+    [endpoint],
+    async () => {
+      const response = await axiosInstance.get(endpoint);
+      return response.data;
+    },
+    {
+      ...options,
+      staleTime: 5 * 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 2,
+    }
+  );
+};
+
+const usePost = (endpoint, options = {}) => {
+  return useMutation(
+    async (data) => {
+      const response = await axiosInstance.post(endpoint, data);
+      return response.data;
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries([endpoint]);
+      },
+      ...options,
+    }
+  );
+};
+```
+
 - **Axios 인터셉터 토큰 갱신**
   - 요청 인터셉터에서 토큰 만료를 확인하고 필요 시 refresh 토큰으로 재발급
   - 응답 인터셉터에서 인증 오류를 처리하고 세션 정리 경로 통합
+  - 코드 예시:
+
+```js
+// src/api/axiosInstance.js
+instance.interceptors.request.use(async (config) => {
+  if (isTokenExpired(accessToken)) {
+    const res = await axios.get(`${process.env.REACT_APP_BASE_URL}/auth/refresh`, {
+      headers: { "x-refresh-token": refreshToken },
+    });
+
+    const newAccess = res.headers["authorization"]?.split(" ")[1];
+    if (newAccess) {
+      setAccessToken(newAccess);
+      localStorage.setItem("accessToken", newAccess);
+      config.headers.Authorization = `Bearer ${newAccess}`;
+    }
+  } else {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return config;
+});
+
+instance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      handleLogout();
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
 - **필터 상태 관리**
   - `useFetchFilteredThemes`에서 필터 상태를 기반으로 endpoint/params 생성
   - query key에 필터 객체를 포함해 조건별 캐시 분리
+  - 코드 예시:
+
+```js
+// src/hooks/useFetchFilteredThemes.js
+return useQuery(
+  ["filteredThemes", filters],
+  async () => {
+    const { region, levelMin, levelMax, isFearActive, isActivityActive, searchTerm } = filters;
+    let endpoint = "/api/theme?sort=rating";
+
+    if (searchTerm.trim()) {
+      endpoint = `/api/theme/search?keyword=${searchTerm.trim()}`;
+    } else {
+      const params = new URLSearchParams();
+      if (region) params.append("location", region);
+      if (levelMin) params.append("levelMin", levelMin);
+      if (levelMax) params.append("levelMax", levelMax);
+      if (isFearActive) params.append("horror", 1);
+      if (isActivityActive) params.append("activity", 1);
+      endpoint = `/api/theme/filter?${params.toString()}`;
+    }
+
+    const response = await axiosInstance.get(endpoint);
+    return response.data;
+  },
+  { enabled: !!filters, staleTime: 5 * 60 * 1000, cacheTime: 10 * 60 * 1000 }
+);
+```
 
 ## 프로젝트 구조
 
