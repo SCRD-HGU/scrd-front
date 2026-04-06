@@ -1,7 +1,8 @@
-# 🗝 방탈출 예약/리뷰/동행 플랫폼 백엔드 (SCRD Front-End)
+# SCRD 프론트엔드
 
-> **웹 스크래핑을 활용한 방탈출 예약/리뷰/동행 통합 플랫폼 - 프론트엔드 레포지토리**
-
+SCRD는 방탈출 테마 탐색, 예약, 리뷰를 지원하는 SPA입니다.
+사용자 흐름은 이커머스 서비스와 유사하게 구성되어 있습니다.
+테마 탐색 -> 검색/필터 -> 상세 확인 -> 예약 가능 시간 확인 -> 예약 -> 리뷰 확인/작성
 
 [![SCRD 앱 홍보영상](https://img.youtube.com/vi/Qu4Drg5c4mA/0.jpg)](https://www.youtube.com/watch?v=Qu4Drg5c4mA)
 
@@ -10,79 +11,82 @@
 - [📽 베타 버전 데모 영상 (Google Drive)](https://drive.google.com/drive/folders/1C0baog9rQ4LC-XmpKbN3uXVEPXcWIz9O)
 - [🌐 SCRD 웹페이지 접속하기](https://scrd.netlify.app/)
 
+## 프로젝트 소개
 
-—
-## 📌 프로젝트 개요
+- **형태**: React 기반 SPA (Single Page Application)
+- **도메인**: 방탈출 예약/리뷰 서비스
+- **핵심 방향**: 방탈출 테마를 "상품"처럼 탐색/비교/선택할 수 있도록 정보 구조 설계
+- **주요 스택**: React, React Router, Recoil, React Query, Axios, styled-components
 
-기존 방탈출 카페 예약 시스템의 단편성과 정보 부족 문제를 해결하고자 전국 방탈출 카페의 예약 가능 시간과 테마 정보를 통합 제공하는 웹/모바일 기반 예약 플랫폼을 개발했습니다.
+## 주요 기능
 
-- 실시간 예약 가능 여부 제공
-- 조건 기반 테마 검색 구현
-- 카카오톡 로그인 및 JWT 토큰 인증
+- **검색/필터**
+  - 테마명 키워드 검색
+  - 다중 조건 필터링: 지역, 난이도 범위, 공포도/활동성
+  - 결과 기반 지역 드롭다운 재필터링
+- **예약**
+  - 테마 상세 페이지에서 날짜별 예약 가능 시간 조회
+  - 7일 단위 탐색 UI로 일정 비교 지원
+- **리뷰**
+  - 테마별 리뷰 조회 및 렌더링
+  - 최신순 정렬, 태그 표시, 펼치기/접기 인터랙션
+- **인증 플로우**
+  - 카카오 OAuth 로그인 콜백 처리
+  - Access/Refresh 토큰 저장 및 앱 초기화 시 세션 복원
+  - 401 응답 시 세션 정리 후 로그인 페이지로 이동
 
-—
+## 아키텍처
 
-## 🧩 주요 기능
+상태는 의도적으로 **클라이언트 상태**와 **서버 상태**로 분리해 관리합니다.
 
-### ✅ 카카오 로그인 연동
-- 카카오 OAuth2.0 로그인 연동
-- 로그인 후 JWT 토큰 로컬스토리지 저장 및 전역 상태 관리 (Recoil)
-- 로그인 시 사용자 정보(닉네임, 프로필 이미지 등) 전역 반영
-- 로그인 후 리디렉션 처리 및 사용자 정보 호출
+- **클라이언트 상태 (Recoil)**
+  - 인증/세션 상태: `tokenState`, `refreshTokenState`, `userTokenState`
+  - OAuth 중간 상태: `codeState`
+- **서버 상태 (React Query)**
+  - API 응답 캐싱, 재시도, stale 정책 관리
+  - mutation 이후 query invalidation으로 UI-서버 데이터 동기화
+- **구성 방식**
+  - `App`에서 전역 Provider를 `ThemeProvider -> RecoilRoot -> QueryClientProvider` 순서로 구성
+  - 토큰 초기화 로직으로 라우팅 이전 세션 복원 처리
 
-### ✅ 테마 탐색 페이지
-- 전체 테마 조회 및 필터링 기능 (지역, 난이도, 공포도, 활동성)
-- React Query 기반 API 데이터 캐싱 및 비동기 처리
-- 추천순 정렬 (리뷰 수 + 평점 가중치 반영)
-- 반응형 UI 디자인 적용 (styled-components 사용)
+## 기술적 결정
 
-### ✅ 리뷰 API
-- 공포도, 활동성, 난이도, 평점 등 UI 인터랙션 구현
+- **왜 Recoil + React Query 조합인가**
+  - Recoil: 전역 UI/인증 상태를 가볍게 관리
+  - React Query: 비동기 서버 데이터 생명주기(fetch/cache/stale/retry) 관리
+  - 한 도구에 책임을 몰지 않고, 역할을 분리해 유지보수성을 높이기 위함
+- **왜 커스텀 훅으로 설계했는가**
+  - 반복되는 API/쿼리 로직을 한 곳에 모아 재사용성 확보
+  - 페이지/컴포넌트는 렌더링과 인터랙션에 집중
+  - 캐시 시간, 재시도, 헤더 정책 등 변경 포인트를 중앙화
 
-### ✅ 프론트 배포 및 운영
-- **React + Vite 프로젝트 구성**
-- **Netlify 기반** 자동 배포 파이프라인 구축
-- 환경변수에 따른 API URL 분리 (개발/운영)
+## 핵심 구현
 
-—
+- **`useApi` 훅**
+  - React Query 기반 공통 CRUD 래퍼(`useGet`, `usePost`, `usePut`, `useDelete`)
+  - 쓰기 작업 이후 query invalidation 전략 적용
+- **Axios 인터셉터 토큰 갱신**
+  - 요청 인터셉터에서 토큰 만료를 확인하고 필요 시 refresh 토큰으로 재발급
+  - 응답 인터셉터에서 인증 오류를 처리하고 세션 정리 경로 통합
+- **필터 상태 관리**
+  - `useFetchFilteredThemes`에서 필터 상태를 기반으로 endpoint/params 생성
+  - query key에 필터 객체를 포함해 조건별 캐시 분리
 
-## 💡 사용 기술 스택
+## 프로젝트 구조
 
-### 🧱 Frontend
-- **React18**, React Router, Recoil
-- **React Query** (데이터 패싱 및 캐싱)
-- styled-components, Swiper
-- Axios (커스텀 인스턴스 구성)
-
-### ⚙️ 상태 및 인증 관리
-- **Recoil** (로그인 상태 및 사용자 정보 관리)
-- LocalStorage / SessionStorage 기반 토큰 관리
-- React Interceptor 기반 JWT 자동 갱신 처리
-
-### 🛠 배포 및 인프라
-- **Netlify** (CI/CD 및 배포 자동화)
-
-—
-
-## 👥 팀 구성 및 역할
-
-오세훈: 기획, 백엔드, 인프라, 프론트엔드, 디자인(UI)
-
-김은진: 디자인 협업
-
-임성빈: 프론트엔드 협업
-
-김경진: 데이터 마이닝
-
-이민규: 모바일 앱 개발
-
-> 프로젝트에서 프론트엔드 개발 주도, **프론트엔드 영역, 배포, React, 인증 시스템, 90% 기여**
-
-—
-
-## 📞 문의
-> 프론트 엔드 개발자 임성빈 · E-mail: bins506@gmail.com
-
-—
-
-본 프로젝트는 기술적 도전과 실용성을 함께 고려하여 기획/개발된 풀스택 서비스입니다. 현업에서 바로 활용 가능한 구조를 설계하고, 실제 예약/리뷰/동행이라는 사용자 시나리오를 기반으로 제작되었습니다.
+```text
+scrd-front/
+├─ escape-room/
+│  ├─ src/
+│  │  ├─ api/            # axios 인스턴스, 인터셉터
+│  │  ├─ hooks/          # useApi, useFetchFilteredThemes
+│  │  ├─ store/          # recoil atom 정의
+│  │  ├─ components/     # 공통 UI (Header, OptionBar, CardSwiper, Reservation, Review)
+│  │  ├─ pages/          # 라우트 페이지 (Login, ThemePage, Detail, MyPage, TierPage 등)
+│  │  ├─ utils/          # token decode 등 유틸리티
+│  │  ├─ App.js          # Provider 구성 및 앱 초기화
+│  │  └─ Router.js       # lazy loading 기반 라우팅
+│  ├─ package.json
+│  └─ README.md
+└─ README.md
+```
